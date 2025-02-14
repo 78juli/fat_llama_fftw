@@ -14,6 +14,32 @@ from mutagen.wave import WAVE
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def initialize_ist(data, threshold):
+    mask = np.abs(data) > threshold
+    data_thres = np.where(mask, data, 0)
+    return data_thres
+
+def perform_ist_iteration(data_thres, threshold):
+    data_fft = pyfftw.interfaces.numpy_fft.fft(data_thres)
+    mask = np.abs(data_fft) > threshold
+    data_fft_thres = np.where(mask, data_fft, 0)
+    data_thres = pyfftw.interfaces.numpy_fft.ifft(data_fft_thres).real
+    return data_thres
+
+def iterative_soft_thresholding(data, max_iter, threshold):
+    data_thres = initialize_ist(data, threshold)
+    num_workers = min(4, max_iter)  # Limit the number of workers to a reasonable number (e.g., 4)
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = []
+        for _ in range(max_iter):
+            futures.append(executor.submit(perform_ist_iteration, data_thres, threshold))
+        
+        for future in concurrent.futures.as_completed(futures):
+            data_thres = future.result()
+    
+    return data_thres
+
 def read_audio(file_path, format):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File {file_path} not found.")
@@ -64,28 +90,6 @@ def new_interpolation_algorithm(data, upscale_factor):
             expanded_data[index] = center_point
     
     return expanded_data
-
-def initialize_ist(data, threshold):
-    mask = np.abs(data) > threshold
-    data_thres = np.where(mask, data, 0)
-    return data_thres
-
-def perform_ist_iteration(data_thres, threshold):
-    data_fft = pyfftw.interfaces.numpy_fft.fft(data_thres)
-    mask = np.abs(data_fft) > threshold
-    data_fft_thres = np.where(mask, data_fft, 0)
-    data_thres = pyfftw.interfaces.numpy_fft.ifft(data_fft_thres).real
-    return data_thres
-
-def iterative_soft_thresholding(data, max_iter, threshold):
-    data_thres = initialize_ist(data, threshold)
-    
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {executor.submit(perform_ist_iteration, data_thres, threshold) for _ in range(max_iter)}
-        for i, future in enumerate(concurrent.futures.as_completed(futures)):
-            data_thres = future.result()
-    
-    return data_thres
 
 def upscale_channels(channels, upscale_factor, max_iter, threshold):
     processed_channels = []
