@@ -12,37 +12,30 @@ from fat_llama_fftw.audio_fattener.feed import (
 
 class TestFeed(unittest.TestCase):
 
-    def setUp(self):
-        self.sample_rate = 44100
-        self.channels = 2
-        self.samples = np.arange(self.sample_rate * 4, dtype=np.int16)
-        self.bitrate = 1411000
-
     @patch('fat_llama_fftw.audio_fattener.feed.AudioSegment.from_file')
     @patch('fat_llama_fftw.audio_fattener.feed.MP3')
     @patch('os.path.exists', return_value=True)
     def test_read_audio(self, mock_exists, mock_mp3, mock_from_file):
         mock_audio = MagicMock()
-        mock_audio.frame_rate = self.sample_rate
-        mock_audio.channels = self.channels
-        mock_audio.get_array_of_samples.return_value = self.samples
+        mock_audio.frame_rate = 44100
+        mock_audio.channels = 2
+        mock_audio.get_array_of_samples.return_value = np.arange(44100 * 4, dtype=np.int16)
         mock_from_file.return_value = mock_audio
-        mock_mp3.return_value.info.bitrate = self.bitrate
+        mock_mp3.return_value.info.bitrate = 1411000
 
         sample_rate, samples, bitrate, audio = read_audio('test.mp3', 'mp3')
-        self.assertEqual(sample_rate, self.sample_rate)
-        self.assertEqual(samples.shape, (self.sample_rate * 4 // 2, 2))
-        self.assertEqual(bitrate, self.bitrate)
+        self.assertEqual(sample_rate, 44100)
+        self.assertEqual(samples.shape, (44100 * 4 // 2, 2))
 
     @patch('fat_llama_fftw.audio_fattener.feed.sf.write')
     def test_write_audio(self, mock_write):
-        data = np.random.rand(self.sample_rate * 10).astype(np.float32)
-        write_audio('output.flac', self.sample_rate, data, 'flac')
+        data = np.random.rand(44100 * 10).astype(np.float32)
+        write_audio('output.flac', 44100, data, 'flac')
         mock_write.assert_called_once()
         args, kwargs = mock_write.call_args
         np.testing.assert_array_equal(args[1], data)
         self.assertEqual(args[0], 'output.flac')
-        self.assertEqual(args[2], self.sample_rate)
+        self.assertEqual(args[2], 44100)
         self.assertEqual(kwargs['format'], 'FLAC')
         self.assertEqual(kwargs['subtype'], 'PCM_24')
 

@@ -11,6 +11,7 @@ setup(
         'soundfile',
         'mutagen',
         'scipy',
+        'atplotlib',
     ],
     package_data={
         'fat_llama_fftw': ['audio_fattener/*.py', 'tests/*.py'],
